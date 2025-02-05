@@ -12,6 +12,7 @@
 
 #define JSON_FILE_PATH "/data/adb/modules/unlimitedphotos/fgp.json"
 #define CUSTOM_JSON_FILE_PATH "/data/adb/modules/unlimitedphotos/custom.fgp.json"
+#define PHOTOS_PACKAGE "com.google.android.apps.photos"
 
 static int verboseLogs = 0;
 static int spoofBuild = 1;
@@ -95,10 +96,11 @@ public:
             return;
         }
 
-        std::string_view process(rawProcess);
+        pkgName = rawProcess;
         std::string_view dir(rawDir);
 
-        isPhotos = dir.ends_with("/com.google.android.apps.photos");
+		isPhotos = dir.ends_with("/com.google.android.apps.photos");
+		isPhotosProc = pkgName == PHOTOS_PACKAGE;
 
         env->ReleaseStringUTFChars(args->nice_name, rawProcess);
         env->ReleaseStringUTFChars(args->app_data_dir, rawDir);
@@ -110,6 +112,11 @@ public:
 
         // We are in Google Photos now, force unmount
         api->setOption(zygisk::FORCE_DENYLIST_UNMOUNT);
+
+        if (!isPhotosProc) {
+            api->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
+            return;
+        }
 
         std::vector<char> jsonVector;
         long dexSize = 0, jsonSize = 0;
@@ -155,8 +162,9 @@ public:
         if (dexVector.empty() || json.empty()) return;
 
         readJson();
+
         if (spoofProps > 0) doHook();
-        inject();
+        if (spoofBuild + spoofProvider + spoofSignature + spoofVendingSdk > 0) inject();
 
         dexVector.clear();
         json.clear();
@@ -171,6 +179,7 @@ private:
     JNIEnv *env = nullptr;
     std::vector<char> dexVector;
     nlohmann::json json;
+    std::string pkgName;
 
     void readJson() {
         LOGD("JSON contains %d keys!", static_cast<int>(json.size()));
@@ -275,8 +284,17 @@ private:
         LOGD("JNI: Calling init");
         auto entryInit = env->GetStaticMethodID(entryClass, "init", "(IIII)V");
         env->CallStaticVoidMethod(entryClass, entryInit, verboseLogs, spoofBuild, spoofProvider, spoofSignature);
+
+        env->DeleteLocalRef(clClass);
+        env->DeleteLocalRef(dexClClass);
+        env->DeleteLocalRef(systemClassLoader);
+        env->DeleteLocalRef(dexCl);
+        env->DeleteLocalRef(buffer);
+        env->DeleteLocalRef(entryClassName);
+        env->DeleteLocalRef(entryClassObj);
     }
 };
+
 
 static void companion(int fd) {
     long dexSize = 0, jsonSize = 0;
@@ -318,6 +336,14 @@ static void companion(int fd) {
 
     dexVector.clear();
     jsonVector.clear();
+}
+
+/*
+ * - The fix is public now: https://github.com/JingMatrix/NeoZygisk/commit/76d54228c7e6fe14cca93338865008946b94f7ee
+ * - Remeber to add this for all other zygisk c++ library
+ */
+extern "C" int __cxa_atexit(void (*func)(void*), void* arg, void* dso) {
+    return 0;
 }
 
 REGISTER_ZYGISK_MODULE(GPhotosUnlimited)
