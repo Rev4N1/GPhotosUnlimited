@@ -3,6 +3,8 @@
 # Add conflicting custom ROM injection app folder/file paths to this list
 # and they will be replaced/hidden systemlessly to disable them
 
-# helluvaOS, hentaiOS
+# helluvaOS
 /system_ext/app/HelluvaProductSpt
+
+# hentaiOS
 /system_ext/app/HentaiProductSpt
