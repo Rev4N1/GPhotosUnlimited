@@ -338,16 +338,6 @@ static void companion(int fd) {
     jsonVector.clear();
 }
 
-/*
- * Fix for Dobby detections
- * Must be added to all Zygisk C++ libraries in a project
- *
- * Reference: https://github.com/JingMatrix/NeoZygisk/commit/76d54228c7e6fe14cca93338865008946b94f7ee
- */
-extern "C" int __cxa_atexit(void (*func)(void*), void* arg, void* dso) {
-    return 0;
-}
-
 REGISTER_ZYGISK_MODULE(GPhotosUnlimited)
 
 REGISTER_ZYGISK_COMPANION(companion)

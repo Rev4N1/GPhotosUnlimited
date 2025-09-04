@@ -6,7 +6,7 @@ find_package(cxx REQUIRED CONFIG)
 
 link_libraries(cxx::cxx)
 
-add_library(${CMAKE_PROJECT_NAME} SHARED ${CMAKE_SOURCE_DIR}/main.cpp)
+add_library(${CMAKE_PROJECT_NAME} SHARED main.cpp local_cxa_atexit_finalize_impl/atexit.cpp)
 
 add_subdirectory(Dobby)
 
