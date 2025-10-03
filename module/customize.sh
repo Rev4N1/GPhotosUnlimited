@@ -5,7 +5,7 @@ if [ -d /data/adb/modules/unlimitedphotos/system ]; then
 fi
 
 # Copy any supported custom files to updated module
-for FILE in custom.app_replace.list custom.fgp.json uninstall.sh; do
+for FILE in custom.app_replace.list custom.fgp.json custom.fgp.prop uninstall.sh; do
     if [ -f "/data/adb/modules/unlimitedphotos/$FILE" ]; then
         ui_print "- Restoring $FILE"
         cp -af /data/adb/modules/unlimitedphotos/$FILE $MODPATH/$FILE
