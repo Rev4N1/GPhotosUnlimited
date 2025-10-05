@@ -23,8 +23,8 @@ done
 
 
 # Replace/hide conflicting custom ROM injection app folders/files to disable them
-LIST=$MODPATH/example.app_replace.list
-[ -f "$MODPATH/custom.app_replace.list" ] && LIST=$MODPATH/custom.app_replace.list
+LIST=$MODPATH/app_replace_list.txt
+[ -f "$MODPATH/custom.app_replace_list.txt" ] && LIST=$MODPATH/custom.app_replace_list.txt
 for APP in $(grep -v '^#' $LIST); do
     if [ -e "$APP" ]; then
         case $APP in
