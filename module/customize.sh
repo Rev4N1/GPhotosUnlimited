@@ -13,7 +13,7 @@ for FILE in custom.app_replace.list custom.fgp.json uninstall.sh; do
 done
 
 # Warn if potentially conflicting modules are installed
-for MODULE in Pixelify PixelifyPhotos unlimitedgpics  ; do
+for MODULE in Pixelify PixelifyPhotos unlimitedgpics; do
     if [ -d /data/adb/modules/$MODULE ]; then
         ui_print "! $MODULE module may cause issues with this module"
     fi

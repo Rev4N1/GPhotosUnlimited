@@ -1,5 +1,4 @@
 -keep class com.rev4n.unlimitedphotos.EntryPoint { public <methods>; }
--keep class com.rev4n.unlimitedphotos.EntryPointVending { public <methods>; }
 -keepclassmembers class com.rev4n.unlimitedphotos.CustomKeyStoreSpi
 -keepclassmembers class com.rev4n.unlimitedphotos.CustomPackageInfoCreator { public <init>(...); }
 -keepclassmembers class com.rev4n.unlimitedphotos.CustomProvider
