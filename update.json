@@ -1,6 +1,6 @@
 {
-    "version": "v1",
-    "versionCode": 10000,
-    "zipUrl": "https://github.com/Rev4N1/GPhotosUnlimited/releases/download/v1/GPhotosUnlimited-v1.zip",
+    "version": "v2",
+    "versionCode": 20000,
+    "zipUrl": "https://github.com/Rev4N1/GPhotosUnlimited/releases/download/v2/GPhotosUnlimited-v2.zip",
     "changelog": "https://raw.githubusercontent.com/Rev4N1/GPhotosUnlimited/main/CHANGELOG.md"
 }
