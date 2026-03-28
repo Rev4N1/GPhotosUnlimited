@@ -287,10 +287,10 @@ private:
 		env->DeleteLocalRef(javaStr);
 
         env->DeleteLocalRef(clClass);
-        env->DeleteLocalRef(dexClClass);
         env->DeleteLocalRef(systemClassLoader);
-        env->DeleteLocalRef(dexCl);
+        env->DeleteLocalRef(dexClClass);
         env->DeleteLocalRef(buffer);
+        env->DeleteLocalRef(dexCl);
         env->DeleteLocalRef(entryClassName);
         env->DeleteLocalRef(entryClassObj);
     }
@@ -339,8 +339,10 @@ static void companion(int fd) {
 }
 
 /*
- * - The fix is public now: https://github.com/JingMatrix/NeoZygisk/commit/76d54228c7e6fe14cca93338865008946b94f7ee
- * - Remeber to add this for all other zygisk c++ library
+ * Fix for Dobby detections
+ * Must be added to all Zygisk C++ libraries in a project
+ *
+ * Reference: https://github.com/JingMatrix/NeoZygisk/commit/76d54228c7e6fe14cca93338865008946b94f7ee
  */
 extern "C" int __cxa_atexit(void (*func)(void*), void* arg, void* dso) {
     return 0;
