@@ -1,0 +1,26 @@
+# Build Fields
+MANUFACTURER=Google
+MODEL=Pixel XL
+FINGERPRINT=google/marlin/marlin:9/PPR1.180610.009/4898911:user/release-keys
+BRAND=google
+PRODUCT=marlin
+DEVICE=marlin
+RELEASE=9
+ID=PPR1.180610.009
+INCREMENTAL=4898911
+TYPE=user
+TAGS=release-keys
+SECURITY_PATCH=2018-08-05
+DEVICE_INITIAL_SDK_INT=25
+
+# System Properties
+*.build.id=PPR1.180610.009
+*.security_patch=2018-08-05
+*api_level=25
+
+# Advanced Settings
+spoofBuild=1
+spoofProps=0
+spoofProvider=0
+spoofSignature=0
+verboseLogs=0
