@@ -164,7 +164,7 @@ public:
         readJson();
 
         if (spoofProps > 0) doHook();
-        if (spoofBuild + spoofProvider + spoofSignature + spoofVendingSdk > 0) inject();
+        if (spoofBuild + spoofProvider + spoofSignature > 0) inject();
 
         dexVector.clear();
         json.clear();
@@ -294,7 +294,6 @@ private:
         env->DeleteLocalRef(entryClassObj);
     }
 };
-
 
 static void companion(int fd) {
     long dexSize = 0, jsonSize = 0;
