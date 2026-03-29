@@ -1,27 +1,3 @@
-# Replace/hide conflicting Pixel Configurations files to disable them
-directory="/system/product/etc/sysconfig"
-for APP in $directory/pixel_experience_*; do
-	# Extract the year from the APP name
-	year="${APP#*pixel_experience_}"
-	year="${year:0:4}"
-
-    # Check if the year is higher than 2019
-	if [ "$year" -gt 2019 ]; then
-        case $APP in
-            /system/*) ;;
-            *) PREFIX=/system;;
-        esac
-        HIDEPATH=$MODPATH$PREFIX$APP
-        mkdir -p $(dirname $HIDEPATH)
-        if [ "$KSU" = "true" -o "$APATCH" = "true" ]; then
-            mknod $HIDEPATH c 0 0
-        else
-            touch $HIDEPATH
-        fi
-    fi
-done
-
-
 # Replace/hide conflicting custom ROM injection app folders/files to disable them
 MAGISK_WHITEOUT=false
 [ -f /data/adb/magisk/util_functions.sh ] && [ "$(grep MAGISK_VER_CODE /data/adb/magisk/util_functions.sh | cut -d= -f2)" -ge 28102 ] && MAGISK_WHITEOUT=true;
@@ -81,4 +57,26 @@ for APP in $(grep -v '^#' $LIST); do
             [ "$HIDECFG" ] && ui_print "!  + $PKGNAME entry commented out in copied overlay config"
         fi
     fi
+done
+
+# Replace/hide conflicting Pixel Configurations files to disable them
+directory="/system/product/etc/sysconfig"
+for APP in $directory/pixel_experience_*; do
+    if [ -e "$APP" ]; then
+		year="${APP#*pixel_experience_}"
+		year="${year:0:4}"
+		if [ "$year" -gt 2019 ]; then
+			case $APP in
+				/system/*) ;;
+				*) PREFIX=/system;;
+			esac
+			HIDEPATH=$MODPATH$PREFIX$APP
+			mkdir -p $(dirname $HIDEPATH)
+            if [ "$KSU" = "true" -o "$APATCH" = "true" -o "$MAGISK_WHITEOUT" = "true" ]; then
+                mknod $HIDEPATH c 0 0
+            else
+                touch $HIDEPATH
+            fi
+		fi
+	fi
 done
