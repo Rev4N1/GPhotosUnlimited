@@ -8,13 +8,29 @@ To use this module you must have one of the following (latest versions):
 - [KernelSU Next](https://github.com/KernelSU-Next/KernelSU-Next) with [Zygisk Next](https://github.com/Dr-TSNG/ZygiskNext) or [ReZygisk](https://github.com/PerformanC/ReZygisk) module installed
 - [APatch](https://github.com/bmax121/APatch) with [Zygisk Next](https://github.com/Dr-TSNG/ZygiskNext) or [ReZygisk](https://github.com/PerformanC/ReZygisk) module installed
 
+> [!IMPORTANT]
+> **KernelSU Next 3.0.0+ users:** Starting with version 3.0.0, KernelSU Next removed its built-in module mount system (see [KernelSU-Next#1078](https://github.com/KernelSU-Next/KernelSU-Next/issues/1078)). Without a mount system, this module's `/system` files — including the `pixel_2016_exclusive.xml` that grants the unlimited-storage entitlement — are **not applied**, so the spoof will be incomplete (Google Photos may show the spoofed Pixel model but still not grant unlimited storage).
+>
+> To restore mounting, install a metamount module such as [Magic Mount (magic_mount_rs)](https://github.com/KernelSU-Modules-Repo/magic_mount_rs), then reboot. After that, clear Google Photos data so it re-checks eligibility.
+>
+> This does not affect Magisk, classic KernelSU (GKI), or APatch, which retain their own mount systems.
+
 ## About module
 
 It injects a classes.dex file to modify fields in the android.os.Build class. Also, it creates a hook in the native code to modify system properties. These are spoofed only into Google Photos.
 
-## About 'custom.app_replace.list' file
+## Verifying unlimited storage
 
-You can customize the included default [example.app_replace.list](https://raw.githubusercontent.com/Rev4N1/GPhotos-Unlimited/main/example.app_replace.list) from the module directory (/data/adb/modules/unlimitedphotos) then rename it to custom.app_replace.list to systemlessly replace any additional conflicting custom ROM spoof injection app paths to disable them.
+After installing (and rebooting), open Google Photos and confirm it reports unlimited / original-quality backup.
+
+> [!NOTE]
+> Recent Google Photos versions no longer surface the unlimited-storage status on the home screen. To check it, go to **Photos → Profile / Settings → Backup**, where the storage tier (e.g. "Original quality" / unlimited) is now shown.
+
+If it isn't working, clear Google Photos app data and reboot, then check again.
+
+## About 'custom.app_replace_list.txt' file
+
+You can customize the included default [app_replace_list.txt](https://raw.githubusercontent.com/Rev4N1/GPhotos-Unlimited/main/module/app_replace_list.txt) from the module directory (/data/adb/modules/unlimitedphotos) then rename it to custom.app_replace_list.txt to systemlessly replace any additional conflicting custom ROM spoof injection app paths to disable them.
 
 ## Troubleshooting
 
@@ -44,7 +60,7 @@ The advanced spoofing options add granular control over what exactly gets spoofe
 
 - Other than for the "verboseLogs" entry (see above), they are all 0 (disabled) or 1 (enabled).
 
-- The "spoofBuild" entry (default 1) controls spoofing the Build Fields from the fingerprint; the "spoofProps" entry (default 1) controls spoofing the System Properties from the fingerprint; the "spoofProvider" entry (default 1) controls spoofing the Keystore Provider, and the "spoofSignature" entry (default 0) controls spoofing the ROM Signature.
+- The "spoofBuild" entry (default 1) controls spoofing the Build Fields from the fingerprint; the "spoofProps" entry (default 0) controls spoofing the System Properties from the fingerprint; the "spoofProvider" entry (default 0) controls spoofing the Keystore Provider, and the "spoofSignature" entry (default 0) controls spoofing the ROM Signature.
 
 </details>
  
