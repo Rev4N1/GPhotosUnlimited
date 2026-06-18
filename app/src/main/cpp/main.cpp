@@ -80,6 +80,36 @@ static void doHook() {
         reinterpret_cast<dobby_dummy_func_t *>(&o_system_property_read_callback));
 }
 
+static void setFieldNative(JNIEnv *env, jclass /* clazz_EntryPoint */, jclass targetClass, jobject fieldObj, jstring typeObj, jobject valueObj) {
+    if (!targetClass || !fieldObj || !typeObj) return;
+
+    jfieldID fieldID = env->FromReflectedField(fieldObj);
+    if (!fieldID) return;
+
+    const char *typeName = env->GetStringUTFChars(typeObj, nullptr);
+
+    if (strcmp(typeName, "java.lang.String") == 0) {
+        env->SetStaticObjectField(targetClass, fieldID, valueObj);
+    } else if (strcmp(typeName, "int") == 0) {
+        jclass intClass = env->FindClass("java/lang/Integer");
+        jmethodID intValue = env->GetMethodID(intClass, "intValue", "()I");
+        jint val = env->CallIntMethod(valueObj, intValue);
+        env->SetStaticIntField(targetClass, fieldID, val);
+    } else if (strcmp(typeName, "long") == 0) {
+        jclass longClass = env->FindClass("java/lang/Long");
+        jmethodID longValue = env->GetMethodID(longClass, "longValue", "()J");
+        jlong val = env->CallLongMethod(valueObj, longValue);
+        env->SetStaticLongField(targetClass, fieldID, val);
+    } else if (strcmp(typeName, "boolean") == 0) {
+        jclass boolClass = env->FindClass("java/lang/Boolean");
+        jmethodID booleanValue = env->GetMethodID(boolClass, "booleanValue", "()Z");
+        jboolean val = env->CallBooleanMethod(valueObj, booleanValue);
+        env->SetStaticBooleanField(targetClass, fieldID, val);
+    }
+
+    env->ReleaseStringUTFChars(typeObj, typeName);
+}
+
 class GPhotosUnlimited : public zygisk::ModuleBase {
 public:
     void onLoad(zygisk::Api *api, JNIEnv *env) override {
@@ -301,32 +331,37 @@ private:
     }
 
     void inject() {
-        LOGD("JNI: Getting system classloader");
-        auto clClass = env->FindClass("java/lang/ClassLoader");
-        auto getSystemClassLoader = env->GetStaticMethodID(clClass, "getSystemClassLoader", "()Ljava/lang/ClassLoader;");
-        auto systemClassLoader = env->CallStaticObjectMethod(clClass, getSystemClassLoader);
+		LOGD("JNI: Getting system classloader");
+		auto clClass = env->FindClass("java/lang/ClassLoader");
+		auto getSystemClassLoader = env->GetStaticMethodID(clClass, "getSystemClassLoader", "()Ljava/lang/ClassLoader;");
+		auto systemClassLoader = env->CallStaticObjectMethod(clClass, getSystemClassLoader);
 
-        LOGD("JNI: Creating module classloader");
-        auto dexClClass = env->FindClass("dalvik/system/InMemoryDexClassLoader");
-        auto dexClInit = env->GetMethodID(dexClClass, "<init>", "(Ljava/nio/ByteBuffer;Ljava/lang/ClassLoader;)V");
-        auto buffer = env->NewDirectByteBuffer(dexVector.data(), static_cast<jlong>(dexVector.size()));
-        auto dexCl = env->NewObject(dexClClass, dexClInit, buffer, systemClassLoader);
+		LOGD("JNI: Creating module classloader");
+		auto dexClClass = env->FindClass("dalvik/system/InMemoryDexClassLoader");
+		auto dexClInit = env->GetMethodID(dexClClass, "<init>", "(Ljava/nio/ByteBuffer;Ljava/lang/ClassLoader;)V");
+		auto buffer = env->NewDirectByteBuffer(dexVector.data(), static_cast<jlong>(dexVector.size()));
+		auto dexCl = env->NewObject(dexClClass, dexClInit, buffer, systemClassLoader);
 
-        LOGD("JNI: Loading module class");
-        auto loadClass = env->GetMethodID(clClass, "loadClass", "(Ljava/lang/String;)Ljava/lang/Class;");
-        auto entryClassName = env->NewStringUTF("com.rev4n.unlimitedphotos.EntryPoint");
-        auto entryClassObj = env->CallObjectMethod(dexCl, loadClass, entryClassName);
+		LOGD("JNI: Loading module class");
+		auto loadClass = env->GetMethodID(clClass, "loadClass", "(Ljava/lang/String;)Ljava/lang/Class;");
+		auto entryClassName = env->NewStringUTF("com.rev4n.unlimitedphotos.EntryPoint");
+		auto entryClassObj = env->CallObjectMethod(dexCl, loadClass, entryClassName);
 
         auto entryClass = (jclass) entryClassObj;
 
-        LOGD("JNI: Sending JSON");
-        auto receiveJson = env->GetStaticMethodID(entryClass, "receiveJson", "(Ljava/lang/String;)V");
-        auto javaStr = env->NewStringUTF(json.dump().c_str());
-        env->CallStaticVoidMethod(entryClass, receiveJson, javaStr);
+		JNINativeMethod methods[] = {
+			{"setFieldNative", "(Ljava/lang/Class;Ljava/lang/reflect/Field;Ljava/lang/String;Ljava/lang/Object;)V", (void*) setFieldNative}
+		};
+		env->RegisterNatives(entryClass, methods, 1);
 
-        LOGD("JNI: Calling EntryPoint.init");
-        auto entryInit = env->GetStaticMethodID(entryClass, "init", "(IIII)V");
-        env->CallStaticVoidMethod(entryClass, entryInit, verboseLogs, spoofBuild, spoofProvider, spoofSignature);
+		LOGD("JNI: Sending JSON");
+		auto receiveJson = env->GetStaticMethodID(entryClass, "receiveJson", "(Ljava/lang/String;)V");
+		auto javaStr = env->NewStringUTF(json.dump().c_str());
+		env->CallStaticVoidMethod(entryClass, receiveJson, javaStr);
+
+		LOGD("JNI: Calling EntryPoint.init");
+		auto entryInit = env->GetStaticMethodID(entryClass, "init", "(IIII)V");
+		env->CallStaticVoidMethod(entryClass, entryInit, verboseLogs, spoofBuild, spoofProvider, spoofSignature);
 		env->DeleteLocalRef(javaStr);
 
         env->DeleteLocalRef(clClass);
@@ -338,6 +373,8 @@ private:
         env->DeleteLocalRef(entryClassObj);
     }
 };
+
+
 
 static void companion(int fd) {
     long dexSize = 0, configSize = 0;
