@@ -349,10 +349,10 @@ private:
 
         auto entryClass = (jclass) entryClassObj;
 
-		JNINativeMethod methods[] = {
-			{"setFieldNative", "(Ljava/lang/Class;Ljava/lang/reflect/Field;Ljava/lang/String;Ljava/lang/Object;)V", (void*) setFieldNative}
-		};
-		env->RegisterNatives(entryClass, methods, 1);
+        JNINativeMethod methods[] = {
+            {"setFieldNative", "(Ljava/lang/Class;Ljava/lang/reflect/Field;Ljava/lang/String;Ljava/lang/Object;)V", (void*) setFieldNative}
+        };
+        env->RegisterNatives(entryClass, methods, 1);
 
 		LOGD("JNI: Sending JSON");
 		auto receiveJson = env->GetStaticMethodID(entryClass, "receiveJson", "(Ljava/lang/String;)V");
