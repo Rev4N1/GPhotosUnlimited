@@ -21,12 +21,12 @@ It injects a classes.dex file to modify fields in the android.os.Build class. Al
 
 ## Verifying unlimited storage
 
-After installing (and rebooting), open Google Photos and confirm it reports unlimited / original-quality backup.
+After installing (and rebooting), **back up a new photo**, then open that photo and swipe up (or tap the ⓘ button) to show its details. Working means the details say the photo does not count against your Google Account storage.
 
-> [!NOTE]
-> Recent Google Photos versions no longer surface the unlimited-storage status on the home screen. To check it, go to **Photos → Profile / Settings → Backup**, where the storage tier (e.g. "Original quality" / unlimited) is now shown.
+> [!IMPORTANT]
+> Check a newly backed-up photo, **not** the settings screen. Google Photos does not reliably surface the storage tier under **Profile / Settings → Backup** any more - it is missing entirely in some versions (7.65 and 7.85 among them) and has moved or reappeared between others. Not seeing it there does not mean the module has failed, and this has cost people days of pointless troubleshooting.
 
-If it isn't working, clear Google Photos app data and reboot, then check again.
+If a newly backed-up photo *does* count against your storage, clear Google Photos app data and reboot, then take another photo and check again.
 
 ## About 'custom.app_replace_list.txt' file
 
