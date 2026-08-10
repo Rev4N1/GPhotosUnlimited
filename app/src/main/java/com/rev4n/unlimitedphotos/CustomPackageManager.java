@@ -66,15 +66,11 @@ final class CustomPackageManager implements InvocationHandler {
     }
 
     /**
-     * True for the original Pixel's features, false for every other Pixel device marker: a device
-     * answering yes to both the 2016 preload features and a newer one gets that newer device's more
-     * limited backup tier instead of the original's. Every com.google.android.feature.*_EXPERIENCE is
-     * denied instead of just the PIXEL_-prefixed ones, which also covers any future codename with no
-     * code change. Returns null when the feature is none of our business.
+     * True for the original Pixel's features, false for every other Pixel device marker.
      */
     private static Boolean desiredValue(String feature) {
         if (OG_PIXEL_FEATURES.contains(feature)) return Boolean.TRUE;
-        if ((feature.startsWith("com.google.android.feature.") && feature.endsWith("_EXPERIENCE"))
+        if ((feature.startsWith("com.google.android.") && feature.contains(".feature.") && feature.endsWith("_EXPERIENCE"))
                 || feature.startsWith("com.google.android.apps.photos.PIXEL_")
                 || feature.startsWith("com.google.android.apps.photos.NEXUS_")) {
             return Boolean.FALSE;
