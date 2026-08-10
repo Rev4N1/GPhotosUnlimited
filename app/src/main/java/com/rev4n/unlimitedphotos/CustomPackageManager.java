@@ -16,7 +16,7 @@ final class CustomPackageManager implements InvocationHandler {
 
     /**
      * Features the original Pixel/Pixel XL declares - the "Pixel Core" and
-     * "Pixel 2016 - Pixel XL (original quality)" buckets of Pixelify-Google-Photos' DeviceProps.kt.
+     * "Pixel 2016 - Pixel (original quality)" from PPR1.180610.009 Factory Image
      */
     private static final Set<String> OG_PIXEL_FEATURES = new HashSet<>(Arrays.asList(
             "com.google.android.feature.PIXEL_EXPERIENCE",
@@ -38,17 +38,19 @@ final class CustomPackageManager implements InvocationHandler {
         if (args != null && args.length > 0 && args[0] instanceof String
                 && "hasSystemFeature".equals(method.getName())) {
             String feature = (String) args[0];
-            Boolean spoofed = spoofFeature(feature);
-            // Anything that isn't a Pixel marker falls through to the real answer
-            if (spoofed != null) return spoofed;
-            if (EntryPoint.getVerboseLogs() > 1) {
-                Object result = invokeOriginal(method, args);
-                // Passthrough, unlike spoofFeature()'s two branches above - logged separately so a
-                // capture at this level sees every feature Photos actually asks about, not just the
-                // ones already known to matter, which is what makes the list above worth trusting
-                EntryPoint.LOG(String.format("hasSystemFeature('%s'): passthrough -> %s", feature, result));
-                return result;
+            Object result = invokeOriginal(method, args);
+            Boolean desired = desiredValue(feature);
+            if (desired != null) {
+                boolean real = Boolean.TRUE.equals(result);
+                if (real != desired) {
+                    EntryPoint.LOG(String.format("[%s]: %b -> %b", feature, real, desired));
+                    return desired;
+                }
             }
+            if (EntryPoint.getVerboseLogs() > 1) {
+                EntryPoint.LOG(String.format("hasSystemFeature('%s'): passthrough -> %s", feature, result));
+            }
+            return result;
         }
         return invokeOriginal(method, args);
     }
@@ -66,22 +68,17 @@ final class CustomPackageManager implements InvocationHandler {
     /**
      * True for the original Pixel's features, false for every other Pixel device marker: a device
      * answering yes to both the 2016 preload features and a newer one gets that newer device's more
-     * limited backup tier instead of the original's. Every com.google.android.feature.*_EXPERIENCE is 
-     * denied instead of just the PIXEL_-prefixed ones, which also covers any future codename with no code change.
-     * Returns null when the feature is none of our business.
+     * limited backup tier instead of the original's. Every com.google.android.feature.*_EXPERIENCE is
+     * denied instead of just the PIXEL_-prefixed ones, which also covers any future codename with no
+     * code change. Returns null when the feature is none of our business.
      */
-    private static Boolean spoofFeature(String feature) {
-        boolean spoofed;
-        if (OG_PIXEL_FEATURES.contains(feature)) {
-            spoofed = true;
-        } else if ((feature.startsWith("com.google.android.feature.") && feature.endsWith("_EXPERIENCE"))
+    private static Boolean desiredValue(String feature) {
+        if (OG_PIXEL_FEATURES.contains(feature)) return Boolean.TRUE;
+        if ((feature.startsWith("com.google.android.feature.") && feature.endsWith("_EXPERIENCE"))
                 || feature.startsWith("com.google.android.apps.photos.PIXEL_")
                 || feature.startsWith("com.google.android.apps.photos.NEXUS_")) {
-            spoofed = false;
-        } else {
-            return null;
+            return Boolean.FALSE;
         }
-        EntryPoint.LOG(String.format("hasSystemFeature('%s'): -> %b", feature, spoofed));
-        return spoofed;
+        return null;
     }
 }
