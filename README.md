@@ -8,23 +8,16 @@ To use this module you must have one of the following (latest versions):
 - [KernelSU Next](https://github.com/KernelSU-Next/KernelSU-Next) with [Zygisk Next](https://github.com/Dr-TSNG/ZygiskNext) or [ReZygisk](https://github.com/PerformanC/ReZygisk) module installed
 - [APatch](https://github.com/bmax121/APatch) with [Zygisk Next](https://github.com/Dr-TSNG/ZygiskNext) or [ReZygisk](https://github.com/PerformanC/ReZygisk) module installed
 
-> [!IMPORTANT]
-> **KernelSU Next 3.0.0+ users:** Starting with version 3.0.0, KernelSU Next removed its built-in module mount system (see [KernelSU-Next#1078](https://github.com/KernelSU-Next/KernelSU-Next/issues/1078)). Without a mount system, this module's `/system` files — including the `pixel_2016_exclusive.xml` that grants the unlimited-storage entitlement — are **not applied**, so the spoof will be incomplete (Google Photos may show the spoofed Pixel model but still not grant unlimited storage).
->
-> To restore mounting, install a metamount module such as [Magic Mount (magic_mount_rs)](https://github.com/KernelSU-Modules-Repo/magic_mount_rs), then reboot. After that, clear Google Photos data so it re-checks eligibility.
->
-> This does not affect Magisk, classic KernelSU (GKI), or APatch, which retain their own mount systems.
-
 ## About module
 
-It injects a classes.dex file to modify fields in the android.os.Build class. Also, it creates a hook in the native code to modify system properties. These are spoofed only into Google Photos.
+It injects a classes.dex file to modify fields in the android.os.Build class. Also, it creates a hook in the native code to modify system properties, and one on `PackageManager.hasSystemFeature()` to answer the Pixel-exclusive feature checks Google Photos uses to decide the backup tier. These are spoofed only into the Google Photos process, entirely in-process, without mounting or modifying any `/system` files, and with no per-device or per-ROM exception - the same answers are forced on every device and every ROM.
 
 ## Verifying unlimited storage
 
 After installing (and rebooting), **back up a new photo**, then open that photo and swipe up (or tap the ⓘ button) to show its details. Working means the details say the photo does not count against your Google Account storage.
 
 > [!IMPORTANT]
-> Check a newly backed-up photo, **not** the settings screen. Google Photos does not reliably surface the storage tier under **Profile / Settings → Backup** any more - it is missing entirely in some versions (7.65 and 7.85 among them) and has moved or reappeared between others. Not seeing it there does not mean the module has failed, and this has cost people days of pointless troubleshooting.
+> Check a newly backed-up photo, **not** the settings screen. Google Photos does not reliably surface the storage tier under **Profile / Settings → Backup** any more - it is missing entirely in some versions and has moved or reappeared between others. Not seeing it there does not mean the module has failed, and this has cost people days of pointless troubleshooting.
 
 If a newly backed-up photo *does* count against your storage, clear Google Photos app data and reboot, then take another photo and check again.
 
@@ -49,7 +42,7 @@ You can read module logs using one of these commands directly after boot:
 
 `adb shell "logcat | grep 'FGP/'"` or `su -c "logcat | grep 'FGP/'"`
 
-Add a "verboseLogs" entry with a value of "0", "1", "2", "3" or "100" to your custom.fgp.json to enable higher logging levels; "100" will dump all Build fields, and all the system properties that Photos is checking.
+Add a "verboseLogs" entry with a value of "0", "1", "2", "3" or "100" to your custom.fgp.json to enable higher logging levels; "100" will dump all Build fields, all the system properties, and system features that Photos is checking.
 
 ## About spoofing Advanced Settings
 
@@ -60,7 +53,7 @@ The advanced spoofing options add granular control over what exactly gets spoofe
 
 - Other than for the "verboseLogs" entry (see above), they are all 0 (disabled) or 1 (enabled).
 
-- The "spoofBuild" entry (default 1) controls spoofing the Build Fields from the fingerprint; the "spoofProps" entry (default 0) controls spoofing the System Properties from the fingerprint; the "spoofProvider" entry (default 0) controls spoofing the Keystore Provider, and the "spoofSignature" entry (default 0) controls spoofing the ROM Signature.
+- The "spoofBuild" entry (default 1) controls spoofing the Build Fields from the fingerprint; the "spoofProps" entry (default 0) controls spoofing the System Properties from the fingerprint; the "spoofProvider" entry (default 0) controls spoofing the Keystore Provider; the "spoofSignature" entry (default 0) controls spoofing the ROM Signature, and the "spoofFeatures" entry (default 1) controls spoofing the Pixel-exclusive features.
 
 </details>
  

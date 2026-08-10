@@ -6,6 +6,9 @@ LIST=$MODPATH/app_replace_list.txt
 [ -f "$MODPATH/custom.app_replace_list.txt" ] && LIST=$MODPATH/custom.app_replace_list.txt
 for APP in $(grep -v '^#' $LIST); do
     if [ -e "$APP" ]; then
+        PREFIX=
+        HIDECFG=
+        PKGNAME=
         case $APP in
             /system/*) ;;
             *) PREFIX=/system;;
@@ -59,24 +62,12 @@ for APP in $(grep -v '^#' $LIST); do
     fi
 done
 
-# Replace/hide conflicting Pixel Configurations files to disable them
-directory="/system/product/etc/sysconfig"
-for APP in $directory/pixel_experience_*; do
-    if [ -e "$APP" ]; then
-		year="${APP#*pixel_experience_}"
-		year="${year:0:4}"
-		if [ "$year" -gt 2019 ]; then
-			case $APP in
-				/system/*) ;;
-				*) PREFIX=/system;;
-			esac
-			HIDEPATH=$MODPATH$PREFIX$APP
-			mkdir -p $(dirname $HIDEPATH)
-            if [ "$KSU" = "true" -o "$APATCH" = "true" -o "$MAGISK_WHITEOUT" = "true" ]; then
-                mknod $HIDEPATH c 0 0
-            else
-                touch $HIDEPATH
-            fi
-		fi
-	fi
-done
+
+# Drop any pixel_experience_*.xml overrides restored from a module version up to v3.
+if [ -d "$MODPATH/system" ]; then
+    for STALE in $(find $MODPATH/system -name 'pixel_experience_*' 2>/dev/null); do
+        ui_print "- Removing obsolete $(basename $STALE) override"
+        rm -f $STALE
+        rmdir -p $(dirname $STALE) 2>/dev/null
+    done
+fi

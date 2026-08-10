@@ -16,6 +16,8 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.KeyStoreSpi;
@@ -66,7 +68,7 @@ public final class EntryPoint {
         return spoofBuildEnabled;
     }
 
-    public static void init(int logLevel, int spoofBuildVal, int spoofProviderVal, int spoofSignatureVal) {
+    public static void init(int logLevel, int spoofBuildVal, int spoofProviderVal, int spoofSignatureVal, int spoofFeaturesVal) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             HiddenApiBypass.addHiddenApiExemptions("");
         }
@@ -76,6 +78,7 @@ public final class EntryPoint {
         if (spoofProviderVal > 0) spoofProvider();
         if (spoofBuildVal > 0) spoofDevice();
         if (spoofSignatureVal > 0) spoofPackageManager();
+        if (spoofFeaturesVal > 0) spoofSystemFeatures();
     }
 
     public static void receiveJson(String data) {
@@ -88,7 +91,6 @@ public final class EntryPoint {
         } catch (IOException|IllegalStateException e) {
             LOG("Couldn't read JSON from Zygisk: " + e);
             map.clear();
-            return;
         }
     }
 
@@ -171,7 +173,44 @@ public final class EntryPoint {
         }
     }
 
-    private static Field findField(Class<?> currentClass, String fieldName) throws NoSuchFieldException {
+    /**
+     * Routes this process' PackageManager feature queries through {@link CustomPackageManager}.
+     * ActivityThread.sPackageManager is what both PackageManager.hasSystemFeature() and its cache
+     * resolve through, and it is still unset this early in app startup, so replacing it here means
+     * every later query goes to the proxy - no method hooking, and nothing outside this process.
+     */
+    private static void spoofSystemFeatures() {
+        try {
+            Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
+            Method getPackageManagerMethod = activityThreadClass.getDeclaredMethod("getPackageManager");
+            getPackageManagerMethod.setAccessible(true);
+            Object realPackageManager = getPackageManagerMethod.invoke(null);
+            if (realPackageManager == null) {
+                LOG("Couldn't get IPackageManager to spoof system features");
+                return;
+            }
+
+            Class<?> iPackageManagerClass = Class.forName("android.content.pm.IPackageManager");
+
+            // Our own classloader, so that the generated proxy can see both IPackageManager (via
+            // its parent) and the handler class
+            Object proxyPackageManager = Proxy.newProxyInstance(
+                    CustomPackageManager.class.getClassLoader(),
+                    new Class<?>[]{iPackageManagerClass},
+                    new CustomPackageManager(realPackageManager));
+
+            Field packageManagerField = findField(activityThreadClass, "sPackageManager");
+            packageManagerField.setAccessible(true);
+            packageManagerField.set(null, proxyPackageManager);
+
+            LOG("Spoof hasSystemFeature done!");
+        } catch (Exception e) {
+            LOG("Couldn't spoof system features: " + e);
+        }
+    }
+
+    private static Field findField(Class<?> startClass, String fieldName) throws NoSuchFieldException {
+        Class<?> currentClass = startClass;
         while (currentClass != null && !currentClass.equals(Object.class)) {
             try {
                 return currentClass.getDeclaredField(fieldName);
@@ -179,7 +218,9 @@ public final class EntryPoint {
                 currentClass = currentClass.getSuperclass();
             }
         }
-        throw new NoSuchFieldException("Field '" + fieldName + "' not found in class hierarchy of " + currentClass.getName());
+        // Report the class we were asked about: currentClass is null/Object by now, so using it
+        // here named the wrong class at best and threw a NullPointerException at worst
+        throw new NoSuchFieldException("Field '" + fieldName + "' not found in class hierarchy of " + startClass.getName());
     }
 
     private static boolean classContainsField(Class className, String fieldName) {
@@ -216,7 +257,7 @@ public final class EntryPoint {
         try {
             Field accessFlagsField = Field.class.getDeclaredField("accessFlags");
             accessFlagsField.setAccessible(true);
-            accessFlagsField.setInt(field, field.getModifiers() & ~java.lang.reflect.Modifier.FINAL);
+            accessFlagsField.setInt(field, field.getModifiers() & ~Modifier.FINAL);
         } catch (NoSuchFieldException | IllegalAccessException e) {
             LOG(String.format("Couldn't modify accessFlags for '%s': " + e, name));
         }

@@ -1,10 +1,13 @@
+# The original 2016 Pixel (non-XL) on its August 2018 build.
+# Values match the real sailfish factory image's system build.prop (Pixel, PPR1.180610.009).
+
 # Build Fields
 MANUFACTURER=Google
-MODEL=Pixel XL
-FINGERPRINT=google/marlin/marlin:9/PPR1.180610.009/4898911:user/release-keys
+MODEL=Pixel
+FINGERPRINT=google/sailfish/sailfish:9/PPR1.180610.009/4898911:user/release-keys
 BRAND=google
-PRODUCT=marlin
-DEVICE=marlin
+PRODUCT=sailfish
+DEVICE=sailfish
 RELEASE=9
 ID=PPR1.180610.009
 INCREMENTAL=4898911
@@ -23,4 +26,5 @@ spoofBuild=1
 spoofProps=0
 spoofProvider=0
 spoofSignature=0
+spoofFeatures=1
 verboseLogs=0

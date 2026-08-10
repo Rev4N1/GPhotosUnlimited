@@ -1,4 +1,6 @@
 #include <android/log.h>
+#include <errno.h>
+#include <stdint.h>
 #include <sys/system_properties.h>
 #include <unistd.h>
 
@@ -20,11 +22,81 @@
 
 static int verboseLogs = 0;
 static int spoofBuild = 1;
-static int spoofProps = 1;
-static int spoofProvider = 1;
+static int spoofProps = 0;
+static int spoofProvider = 0;
 static int spoofSignature = 0;
+static int spoofFeatures = 1;
 
 static std::map<std::string, std::string> jsonProps;
+
+// std::stoi() calls std::abort() instead of throwing here (built with -fno-exceptions), which
+// would take Google Photos down over a typo in the config, so parse the value by hand.
+static bool parseInt(const std::string &str, int &out) {
+    size_t pos = 0;
+    bool negative = false;
+    if (!str.empty() && (str[0] == '-' || str[0] == '+')) {
+        negative = str[0] == '-';
+        pos = 1;
+    }
+    if (pos >= str.size()) return false;
+    int value = 0;
+    for (; pos < str.size(); pos++) {
+        if (str[pos] < '0' || str[pos] > '9') return false;
+        value = value * 10 + (str[pos] - '0');
+    }
+    out = negative ? -value : value;
+    return true;
+}
+
+// Trailing whitespace in a config value ends up spoofed verbatim into a Build field otherwise.
+static void trim(std::string &str) {
+    size_t last = str.find_last_not_of(" \t");
+    if (last == std::string::npos) {
+        str.clear();
+        return;
+    }
+    str.resize(last + 1);
+    str.erase(0, str.find_first_not_of(" \t"));
+}
+
+// Reads one integer "Advanced Settings" entry, if present, then drops it from the parsed config
+// so only Build field names are left over to hand to the Java side.
+static void readSetting(nlohmann::json &json, const char *name, int &target, const char *description) {
+    if (!json.contains(name)) return;
+    auto value = json[name];
+    if (!value.is_null() && value.is_string() && value != "" && parseInt(value.get<std::string>(), target)) {
+        if (verboseLogs > 0 && description != nullptr) {
+            LOGD("%s %s!", description, (target > 0) ? "enabled" : "disabled");
+        }
+    } else {
+        LOGD("Error parsing %s!", name);
+    }
+    json.erase(name);
+}
+
+// A single read()/write() can come up short on a socket, which would leave a truncated dex or
+// config behind, so keep going until the whole payload has moved.
+static bool transferFull(int fd, void *buffer, size_t size, bool writing) {
+    auto *ptr = static_cast<uint8_t *>(buffer);
+    while (size > 0) {
+        ssize_t moved = writing ? write(fd, ptr, size) : read(fd, ptr, size);
+        if (moved <= 0) {
+            if (moved < 0 && errno == EINTR) continue;
+            return false;
+        }
+        ptr += moved;
+        size -= static_cast<size_t>(moved);
+    }
+    return true;
+}
+
+static bool readFull(int fd, void *buffer, size_t size) {
+    return transferFull(fd, buffer, size, false);
+}
+
+static bool writeFull(int fd, void *buffer, size_t size) {
+    return transferFull(fd, buffer, size, true);
+}
 
 typedef void (*T_Callback)(void *, const char *, const char *, uint32_t);
 
@@ -120,21 +192,28 @@ public:
     void preAppSpecialize(zygisk::AppSpecializeArgs *args) override {
         bool isPhotos = false, isPhotosProc = false;
 
-        auto rawProcess = env->GetStringUTFChars(args->nice_name, nullptr);
-        auto rawDir = env->GetStringUTFChars(args->app_data_dir, nullptr);
-
-        // Prevent crash on apps with no data dir
-        if (rawDir == nullptr) {
-            env->ReleaseStringUTFChars(args->nice_name, rawProcess);
+        // Prevent crash on apps with no nice name/data dir: GetStringUTFChars() aborts on a null
+        // jstring, so these have to be checked before the conversion rather than after it.
+        if (args == nullptr || args->nice_name == nullptr || args->app_data_dir == nullptr) {
             api->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
             return;
         }
 
-        pkgName = rawProcess;
+        auto rawProcess = env->GetStringUTFChars(args->nice_name, nullptr);
+        auto rawDir = env->GetStringUTFChars(args->app_data_dir, nullptr);
+
+        if (rawProcess == nullptr || rawDir == nullptr) {
+            if (rawProcess != nullptr) env->ReleaseStringUTFChars(args->nice_name, rawProcess);
+            if (rawDir != nullptr) env->ReleaseStringUTFChars(args->app_data_dir, rawDir);
+            api->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
+            return;
+        }
+
+        std::string_view process(rawProcess);
         std::string_view dir(rawDir);
 
-		isPhotos = dir.ends_with("/com.google.android.apps.photos");
-		isPhotosProc = pkgName == PHOTOS_PACKAGE;
+		isPhotos = dir.ends_with("/" PHOTOS_PACKAGE);
+		isPhotosProc = process == PHOTOS_PACKAGE;
 
         env->ReleaseStringUTFChars(args->nice_name, rawProcess);
         env->ReleaseStringUTFChars(args->app_data_dir, rawDir);
@@ -157,8 +236,12 @@ public:
 
         int fd = api->connectCompanion();
 
-        read(fd, &dexSize, sizeof(long));
-        read(fd, &configSize, sizeof(long));
+        if (!readFull(fd, &dexSize, sizeof(long)) || !readFull(fd, &configSize, sizeof(long))) {
+            close(fd);
+            LOGD("Couldn't read sizes from companion");
+            api->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
+            return;
+        }
 
         if (dexSize < 1) {
             close(fd);
@@ -178,10 +261,15 @@ public:
         LOGD("Read from file descriptor for 'config' -> %ld bytes", configSize);
 
         dexVector.resize(dexSize);
-        read(fd, dexVector.data(), dexSize);
-
         configVector.resize(configSize);
-        read(fd, configVector.data(), configSize);
+
+        if (!readFull(fd, dexVector.data(), dexSize) || !readFull(fd, configVector.data(), configSize)) {
+            close(fd);
+            LOGD("Couldn't read dex/config payload from companion");
+            dexVector.clear();  // postAppSpecialize() keys off this to skip a truncated dex
+            api->setOption(zygisk::DLCLOSE_MODULE_LIBRARY);
+            return;
+        }
 
         close(fd);
 
@@ -196,9 +284,19 @@ public:
             char propDelimiter = '=';
             char commentDelimiter = '#';
             size_t beginPos = 0, endPos = 0;
-            while ((endPos = configString.find('\n', beginPos)) != std::string::npos) {
-                std::string line = configString.substr(beginPos, endPos - beginPos);
-                beginPos = endPos + 1;
+            // A final line with no trailing newline still counts, otherwise the last entry of
+            // every config would be silently dropped.
+            while (beginPos < configString.size()) {
+                endPos = configString.find('\n', beginPos);
+                std::string line;
+                if (endPos == std::string::npos) {
+                    line = configString.substr(beginPos);
+                    beginPos = configString.size();
+                } else {
+                    line = configString.substr(beginPos, endPos - beginPos);
+                    beginPos = endPos + 1;
+                }
+                trim(line);
                 if (line.empty() || line[0] == '#') continue;
                 std::string name, value;
                 size_t propDelimiterPos = line.find(propDelimiter);
@@ -212,23 +310,18 @@ public:
                 size_t commentDelimiterPos = value.find(commentDelimiter);
                 if (commentDelimiterPos != std::string::npos) {
                     value = value.substr(0, commentDelimiterPos);
-                    size_t lastPos = value.find_last_not_of(" ");
-                    if (lastPos != std::string::npos) value.resize(lastPos + 1);
                 }
+                trim(name);
+                trim(value);
                 jsonString += "\n\"" + name + "\": \"" + value + "\",";
             }
             if (jsonString.back() == ',') jsonString.pop_back();
             jsonString += "\n}\n";
 
             configString = jsonString;
-
-            jsonString.clear();
         }
 
         json = nlohmann::json::parse(configString, nullptr, false, true);
-
-        configVector.clear();
-        configString.clear();
     }
 
     void postAppSpecialize(const zygisk::AppSpecializeArgs *args) override {
@@ -237,7 +330,7 @@ public:
         readJson();
 
         if (spoofProps > 0) doHook();
-        if (spoofBuild + spoofProvider + spoofSignature > 0) inject();
+        if (spoofBuild + spoofProvider + spoofSignature + spoofFeatures > 0) inject();
 
         dexVector.clear();
         json.clear();
@@ -258,53 +351,15 @@ private:
         LOGD("JSON contains %d keys!", static_cast<int>(json.size()));
 
         // Verbose logging level
-        if (json.contains("verboseLogs")) {
-            if (!json["verboseLogs"].is_null() && json["verboseLogs"].is_string() && json["verboseLogs"] != "") {
-                verboseLogs = stoi(json["verboseLogs"].get<std::string>());
-                if (verboseLogs > 0) LOGD("Verbose logging (level %d) enabled!", verboseLogs);
-            } else {
-                LOGD("Error parsing verboseLogs!");
-            }
-            json.erase("verboseLogs");
-        }
+        readSetting(json, "verboseLogs", verboseLogs, nullptr);
+        if (verboseLogs > 0) LOGD("Verbose logging (level %d) enabled!", verboseLogs);
 
         // Advanced spoofing settings
-        if (json.contains("spoofBuild")) {
-            if (!json["spoofBuild"].is_null() && json["spoofBuild"].is_string() && json["spoofBuild"] != "") {
-                spoofBuild = stoi(json["spoofBuild"].get<std::string>());
-                if (verboseLogs > 0) LOGD("Spoofing Build Fields %s!", (spoofBuild > 0) ? "enabled" : "disabled");
-            } else {
-                LOGD("Error parsing spoofBuild!");
-            }
-            json.erase("spoofBuild");
-        }
-        if (json.contains("spoofProps")) {
-            if (!json["spoofProps"].is_null() && json["spoofProps"].is_string() && json["spoofProps"] != "") {
-                spoofProps = stoi(json["spoofProps"].get<std::string>());
-                if (verboseLogs > 0) LOGD("Spoofing System Properties %s!", (spoofProps > 0) ? "enabled" : "disabled");
-            } else {
-                LOGD("Error parsing spoofProps!");
-            }
-            json.erase("spoofProps");
-        }
-        if (json.contains("spoofProvider")) {
-            if (!json["spoofProvider"].is_null() && json["spoofProvider"].is_string() && json["spoofProvider"] != "") {
-                spoofProvider = stoi(json["spoofProvider"].get<std::string>());
-                if (verboseLogs > 0) LOGD("Spoofing Keystore Provider %s!", (spoofProvider > 0) ? "enabled" : "disabled");
-            } else {
-                LOGD("Error parsing spoofProvider!");
-            }
-            json.erase("spoofProvider");
-        }
-        if (json.contains("spoofSignature")) {
-            if (!json["spoofSignature"].is_null() && json["spoofSignature"].is_string() && json["spoofSignature"] != "") {
-                spoofSignature = stoi(json["spoofSignature"].get<std::string>());
-                if (verboseLogs > 0) LOGD("Spoofing ROM Signature %s!", (spoofSignature > 0) ? "enabled" : "disabled");
-            } else {
-                LOGD("Error parsing spoofSignature!");
-            }
-            json.erase("spoofSignature");
-        }
+        readSetting(json, "spoofBuild", spoofBuild, "Spoofing Build Fields");
+        readSetting(json, "spoofProps", spoofProps, "Spoofing System Properties");
+        readSetting(json, "spoofProvider", spoofProvider, "Spoofing Keystore Provider");
+        readSetting(json, "spoofSignature", spoofSignature, "Spoofing ROM Signature");
+        readSetting(json, "spoofFeatures", spoofFeatures, "Spoofing Pixel System Features");
 
         std::vector<std::string> eraseKeys;
         for (auto &jsonList: json.items()) {
@@ -330,38 +385,60 @@ private:
         }
     }
 
+    // Leaving a pending JNI exception behind (or calling a null method ID, which aborts) would
+    // crash Google Photos on the next JNI transition, so bail out cleanly instead. This is what
+    // a stale classes.dex from a partially applied module update looks like from here.
+    bool jniFailed(const char *what) {
+        if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+            LOGD("JNI: %s", what);
+            return true;
+        }
+        return false;
+    }
+
     void inject() {
 		LOGD("JNI: Getting system classloader");
 		auto clClass = env->FindClass("java/lang/ClassLoader");
 		auto getSystemClassLoader = env->GetStaticMethodID(clClass, "getSystemClassLoader", "()Ljava/lang/ClassLoader;");
 		auto systemClassLoader = env->CallStaticObjectMethod(clClass, getSystemClassLoader);
+		if (jniFailed("Couldn't get system classloader")) return;
 
 		LOGD("JNI: Creating module classloader");
 		auto dexClClass = env->FindClass("dalvik/system/InMemoryDexClassLoader");
 		auto dexClInit = env->GetMethodID(dexClClass, "<init>", "(Ljava/nio/ByteBuffer;Ljava/lang/ClassLoader;)V");
 		auto buffer = env->NewDirectByteBuffer(dexVector.data(), static_cast<jlong>(dexVector.size()));
 		auto dexCl = env->NewObject(dexClClass, dexClInit, buffer, systemClassLoader);
+		if (jniFailed("Couldn't create module classloader")) return;
 
 		LOGD("JNI: Loading module class");
 		auto loadClass = env->GetMethodID(clClass, "loadClass", "(Ljava/lang/String;)Ljava/lang/Class;");
 		auto entryClassName = env->NewStringUTF("com.rev4n.unlimitedphotos.EntryPoint");
 		auto entryClassObj = env->CallObjectMethod(dexCl, loadClass, entryClassName);
+		if (jniFailed("Couldn't load module class")) return;
 
         auto entryClass = (jclass) entryClassObj;
 
         JNINativeMethod methods[] = {
             {"setFieldNative", "(Ljava/lang/Class;Ljava/lang/reflect/Field;Ljava/lang/String;Ljava/lang/Object;)V", (void*) setFieldNative}
         };
-        env->RegisterNatives(entryClass, methods, 1);
+        if (env->RegisterNatives(entryClass, methods, 1) != JNI_OK) {
+            jniFailed("Couldn't register setFieldNative");
+            return;
+        }
 
 		LOGD("JNI: Sending JSON");
 		auto receiveJson = env->GetStaticMethodID(entryClass, "receiveJson", "(Ljava/lang/String;)V");
+		if (jniFailed("Couldn't find EntryPoint.receiveJson")) return;
 		auto javaStr = env->NewStringUTF(json.dump().c_str());
 		env->CallStaticVoidMethod(entryClass, receiveJson, javaStr);
+		if (jniFailed("EntryPoint.receiveJson threw")) return;
 
 		LOGD("JNI: Calling EntryPoint.init");
-		auto entryInit = env->GetStaticMethodID(entryClass, "init", "(IIII)V");
-		env->CallStaticVoidMethod(entryClass, entryInit, verboseLogs, spoofBuild, spoofProvider, spoofSignature);
+		auto entryInit = env->GetStaticMethodID(entryClass, "init", "(IIIII)V");
+		if (jniFailed("Couldn't find EntryPoint.init")) return;
+		env->CallStaticVoidMethod(entryClass, entryInit, verboseLogs, spoofBuild, spoofProvider, spoofSignature, spoofFeatures);
+		jniFailed("EntryPoint.init threw");
 		env->DeleteLocalRef(javaStr);
 
         env->DeleteLocalRef(clClass);
@@ -376,50 +453,41 @@ private:
 
 
 
+// Slurps a whole file, reporting the number of bytes actually read rather than the file size, so
+// a short read can't leave uninitialised tail bytes to be sent as if they were real content.
+static long readFile(FILE *file, std::vector<char> &out) {
+    if (!file) return 0;
+    long size = 0;
+    if (fseek(file, 0, SEEK_END) == 0) {
+        size = ftell(file);
+        if (fseek(file, 0, SEEK_SET) != 0) size = 0;
+    }
+    if (size > 0) {
+        out.resize(size);
+        out.resize(fread(out.data(), 1, size, file));
+    }
+    fclose(file);
+    return static_cast<long>(out.size());
+}
+
 static void companion(int fd) {
-    long dexSize = 0, configSize = 0;
     std::vector<char> dexVector, configVector;
 
-    FILE *dex = fopen(DEX_FILE_PATH, "rb");
-
-    if (dex) {
-        fseek(dex, 0, SEEK_END);
-        dexSize = ftell(dex);
-        fseek(dex, 0, SEEK_SET);
-
-        dexVector.resize(dexSize);
-        fread(dexVector.data(), 1, dexSize, dex);
-
-        fclose(dex);
-    }
+    long dexSize = readFile(fopen(DEX_FILE_PATH, "rb"), dexVector);
 
     FILE *config = fopen(CUSTOM_PROP_FILE_PATH, "r");
     if (!config)
         config = fopen(CUSTOM_JSON_FILE_PATH, "r");
     if (!config)
         config = fopen(PROP_FILE_PATH, "r");
-    if (!config)
-        config = fopen(JSON_FILE_PATH, "r");
 
-    if (config) {
-        fseek(config, 0, SEEK_END);
-        configSize = ftell(config);
-        fseek(config, 0, SEEK_SET);
+    long configSize = readFile(config, configVector);
 
-        configVector.resize(configSize);
-        fread(configVector.data(), 1, configSize, config);
-
-        fclose(config);
+    if (!writeFull(fd, &dexSize, sizeof(long)) || !writeFull(fd, &configSize, sizeof(long))
+            || !writeFull(fd, dexVector.data(), dexSize)
+            || !writeFull(fd, configVector.data(), configSize)) {
+        LOGD("Couldn't write dex/config to the module");
     }
-
-    write(fd, &dexSize, sizeof(long));
-    write(fd, &configSize, sizeof(long));
-
-    write(fd, dexVector.data(), dexSize);
-    write(fd, configVector.data(), configSize);
-
-    dexVector.clear();
-    configVector.clear();
 }
 
 REGISTER_ZYGISK_MODULE(GPhotosUnlimited)
