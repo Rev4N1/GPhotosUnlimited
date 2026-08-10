@@ -1,9 +1,9 @@
 # Google Photos Unlimited
 
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/Rev4N1/GPhotosUnlimited?label=Release&color=blue&style=flat)](https://github.com/Rev4N1/GPhotosUnlimited/releases/latest)
-[![GitHub Release Date](https://img.shields.io/github/release-date/Rev4N1/GPhotosUnlimited?label=Release%20Date&color=brightgreen&style=flat)](https://github.com/Rev4N1/GPhotosUnlimited/releases)
+[![GitHub Release Date](https://img.shields.io/github/release-date/Rev4N1/GPhotosUnlimited?label=Release%20Date&color=brightgreen&style=flat)](https://github.com/Rev4N1/GPhotosUnlimited/releases)  
 [![Main Releases](https://img.shields.io/github/downloads/Rev4N1/GPhotosUnlimited/latest/total?label=Main%20Repo%20Downloads%20%28Latest%20Release%29&color=blue&style=flat)](https://github.com/Rev4N1/GPhotosUnlimited/releases/latest)
-[![Main All Releases](https://img.shields.io/github/downloads/Rev4N1/GPhotosUnlimited/total?label=Main%20Repo%20Total%20Downloads%20%28All%20Releases%29&color=brightgreen&style=flat)](https://github.com/Rev4N1/GPhotosUnlimited/releases)  
+[![Main All Releases](https://img.shields.io/github/downloads/Rev4N1/GPhotosUnlimited/total?label=Main%20Repo%20Total%20Downloads%20%28All%20Releases%29&color=brightgreen&style=flat)](https://github.com/Rev4N1/GPhotosUnlimited/releases)
 
 A Zygisk module which gives unlimited Google Photos storage.
 

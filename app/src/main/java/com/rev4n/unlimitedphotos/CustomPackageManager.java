@@ -81,9 +81,7 @@ final class CustomPackageManager implements InvocationHandler {
         } else {
             return null;
         }
-        if (EntryPoint.getVerboseLogs() > 0) {
-            EntryPoint.LOG(String.format("hasSystemFeature('%s'): -> %b", feature, spoofed));
-        }
+        EntryPoint.LOG(String.format("hasSystemFeature('%s'): -> %b", feature, spoofed));
         return spoofed;
     }
 }

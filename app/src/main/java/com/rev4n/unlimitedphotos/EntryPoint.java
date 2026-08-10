@@ -268,7 +268,7 @@ public final class EntryPoint {
             return;
         }
         if (value.equals(oldValue)) {
-            if (verboseLogs > 2) LOG(String.format("[%s]: %s (unchanged)", name, value));
+            LOG(String.format("[%s]: %s (unchanged)", name, value));
             return;
         }
         Class<?> fieldType = field.getType();
