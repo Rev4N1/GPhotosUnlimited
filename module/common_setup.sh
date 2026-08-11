@@ -69,6 +69,6 @@ if [ -d "$MODPATH/system" ]; then
         ui_print "- Removing obsolete $(basename $STALE) override"
         rm -f $STALE
     done
-    # Clean up any directories left empty by the removals above (deepest first)
-    find $MODPATH/system -mindepth 1 -depth -type d -exec rmdir {} \; 2>/dev/null
+    # Clean up any directories left empty by the removals above
+    find $MODPATH/system -depth -type d -exec rmdir {} \; 2>/dev/null
 fi
