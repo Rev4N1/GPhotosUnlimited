@@ -63,11 +63,12 @@ for APP in $(grep -v '^#' $LIST); do
 done
 
 
-# Drop any pixel_experience_*.xml overrides restored from a module version up to v3.
+# Drop any Pixel Features xml's overrides restored from a module version up to v3.
 if [ -d "$MODPATH/system" ]; then
-    for STALE in $(find $MODPATH/system -name 'pixel_experience_*' 2>/dev/null); do
+    for STALE in $(find $MODPATH/system \( -iname 'pixel_experience_*.xml' -o -iname 'pixel_*_exclusive.xml' \) 2>/dev/null); do
         ui_print "- Removing obsolete $(basename $STALE) override"
         rm -f $STALE
-        rmdir -p $(dirname $STALE) 2>/dev/null
     done
+    # Clean up any directories left empty by the removals above (deepest first)
+    find $MODPATH/system -mindepth 1 -depth -type d -exec rmdir {} \; 2>/dev/null
 fi
