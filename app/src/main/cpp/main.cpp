@@ -1,4 +1,6 @@
+#include <algorithm>
 #include <android/log.h>
+#include <cctype>
 #include <errno.h>
 #include <stdint.h>
 #include <sys/system_properties.h>
@@ -60,7 +62,7 @@ static void trim(std::string &str) {
 }
 
 // Reads one integer "Advanced Settings" entry, if present, then drops it from the parsed config
-// so only Build field names are left over to hand to the Java side.
+// so only Build field names and feature names are left over to hand to the Java side.
 static void readSetting(nlohmann::json &json, const char *name, int &target, const char *description) {
     if (!json.contains(name)) return;
     auto value = json[name];
@@ -365,7 +367,19 @@ private:
         for (auto &jsonList: json.items()) {
             if (verboseLogs > 1) LOGD("Parsing %s", jsonList.key().c_str());
             if (jsonList.key().find_first_of("*.") != std::string::npos) {
-                // Name contains . or * (wildcard) so assume real property name
+                // Property names are lower-case (e.g. "*.security_patch"); Pixel feature markers
+                // have an upper-case leaf segment (e.g. "...feature.PIXEL_EXPERIENCE"). Features
+                // are handled Java-side, so just leave those in json as-is.
+                bool isFeature = std::any_of(jsonList.key().cbegin(), jsonList.key().cend(),
+                        [](unsigned char c) { return std::isupper(c); });
+                if (isFeature) {
+                    if (jsonList.value().is_null() || !jsonList.value().is_string() || jsonList.value() == "") {
+                        LOGD("%s is empty, skipping", jsonList.key().c_str());
+                        eraseKeys.push_back(jsonList.key());
+                    }
+                    continue;
+                }
+
                 if (!jsonList.value().is_null() && jsonList.value().is_string()) {
                     if (jsonList.value() == "") {
                         LOGD("%s is empty, skipping", jsonList.key().c_str());

@@ -123,8 +123,13 @@ public final class EntryPoint {
 
     static void spoofDevice() {
         for (String key : map.keySet()) {
+            if (key.indexOf('.') >= 0 || key.indexOf('*') >= 0) continue; // feature name, not a Build field
             setField(key, map.get(key));
         }
+    }
+
+    static String getFeatureOverride(String feature) {
+        return map.get(feature);
     }
 
     private static void spoofPackageManager() {

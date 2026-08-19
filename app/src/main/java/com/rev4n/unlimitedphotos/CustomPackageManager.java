@@ -3,29 +3,12 @@ package com.rev4n.unlimitedphotos;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
 
 /**
- * Answers Google Photos' Pixel feature queries the way the original 2016 Pixel/Pixel XL would,
- * matching the Build fields fgp.prop spoofs. Installed as a {@link java.lang.reflect.Proxy} over
- * the app process' IPackageManager, so it only ever affects the process it is installed in.
+ * Answers Google Photos' Pixel feature queries as configured in fgp.prop, purely per-process via
+ * a {@link java.lang.reflect.Proxy} over IPackageManager.
  */
 final class CustomPackageManager implements InvocationHandler {
-
-    /**
-     * Features the original Pixel/Pixel XL declares - the "Pixel Core" and
-     * "Pixel 2016 - Pixel (original quality)" from PPR1.180610.009 Factory Image
-     */
-    private static final Set<String> OG_PIXEL_FEATURES = new HashSet<>(Arrays.asList(
-            "com.google.android.feature.PIXEL_EXPERIENCE",
-            "com.google.android.feature.GOOGLE_BUILD",
-            "com.google.android.feature.GOOGLE_EXPERIENCE",
-            "com.google.android.apps.photos.NEXUS_PRELOAD",
-            "com.google.android.apps.photos.nexus_preload",
-            "com.google.android.apps.photos.PIXEL_PRELOAD",
-            "com.google.android.apps.photos.PIXEL_2016_PRELOAD"));
 
     private final Object original;
 
@@ -39,13 +22,19 @@ final class CustomPackageManager implements InvocationHandler {
                 && "hasSystemFeature".equals(method.getName())) {
             String feature = (String) args[0];
             Object result = invokeOriginal(method, args);
-            Boolean desired = desiredValue(feature);
-            if (desired != null) {
+            String override = EntryPoint.getFeatureOverride(feature);
+            if (override != null) {
                 boolean real = Boolean.TRUE.equals(result);
-                if (real != desired) {
-                    EntryPoint.LOG(String.format("[%s]: %b -> %b", feature, real, desired));
-                    return desired;
+                boolean desired = Boolean.parseBoolean(override);
+                if (!"true".equalsIgnoreCase(override) && !"false".equalsIgnoreCase(override)) {
+                    EntryPoint.LOG(String.format("[%s]: fgp.prop value '%s' isn't 'true' or 'false', treating as false", feature, override));
                 }
+                if (real != desired) {
+                    EntryPoint.LOG(String.format("[%s]: %b -> %b (fgp.prop)", feature, real, desired));
+                } else if (EntryPoint.getVerboseLogs() > 1) {
+                    EntryPoint.LOG(String.format("[%s]: %b (unchanged, fgp.prop)", feature, real));
+                }
+                return desired;
             }
             if (EntryPoint.getVerboseLogs() > 1) {
                 EntryPoint.LOG(String.format("hasSystemFeature('%s'): passthrough -> %s", feature, result));
@@ -63,18 +52,5 @@ final class CustomPackageManager implements InvocationHandler {
             // caller as an UndeclaredThrowableException instead
             throw e.getCause() != null ? e.getCause() : e;
         }
-    }
-
-    /**
-     * True for the original Pixel's features, false for every other Pixel device marker.
-     */
-    private static Boolean desiredValue(String feature) {
-        if (OG_PIXEL_FEATURES.contains(feature)) return Boolean.TRUE;
-        if ((feature.startsWith("com.google.android.") && feature.contains(".feature.") && feature.endsWith("_EXPERIENCE"))
-                || feature.startsWith("com.google.android.apps.photos.PIXEL_")
-                || feature.startsWith("com.google.android.apps.photos.NEXUS_")) {
-            return Boolean.FALSE;
-        }
-        return null;
     }
 }

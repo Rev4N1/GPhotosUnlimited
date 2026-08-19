@@ -25,6 +25,14 @@ DEVICE_INITIAL_SDK_INT=25
 *.security_patch=2018-08-05
 *api_level=25
 
+# Feature Overrides
+com.google.android.feature.PIXEL_EXPERIENCE=true
+com.google.android.feature.GOOGLE_BUILD=true
+com.google.android.feature.GOOGLE_EXPERIENCE=true
+com.google.android.apps.photos.NEXUS_PRELOAD=true
+com.google.android.apps.photos.PIXEL_PRELOAD=true
+com.google.android.apps.photos.PIXEL_2016_PRELOAD=true
+
 # Advanced Settings
 spoofBuild=1
 spoofProps=0

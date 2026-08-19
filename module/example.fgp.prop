@@ -29,6 +29,14 @@ DEVICE_INITIAL_SDK_INT=
 *.security_patch=  # for ro.build.version.security_patch
 *api_level=        # for ro.board.api_level, ro.board.first_api_level, ro.product.first_api_level and ro.vendor.api_level
 
+# Feature Overrides
+com.google.android.feature.PIXEL_EXPERIENCE=
+com.google.android.feature.GOOGLE_BUILD=
+com.google.android.feature.GOOGLE_EXPERIENCE=
+com.google.android.apps.photos.NEXUS_PRELOAD=
+com.google.android.apps.photos.PIXEL_PRELOAD=
+com.google.android.apps.photos.PIXEL_2016_PRELOAD=
+
 # Advanced Settings
 spoofBuild=1
 spoofProps=0
