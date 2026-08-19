@@ -27,12 +27,12 @@ final class CustomPackageManager implements InvocationHandler {
                 boolean real = Boolean.TRUE.equals(result);
                 boolean desired = Boolean.parseBoolean(override);
                 if (!"true".equalsIgnoreCase(override) && !"false".equalsIgnoreCase(override)) {
-                    EntryPoint.LOG(String.format("[%s]: fgp.prop value '%s' isn't 'true' or 'false', treating as false", feature, override));
+                    EntryPoint.LOG(String.format("[%s]: value '%s' isn't 'true' or 'false', treating as false", feature, override));
                 }
                 if (real != desired) {
-                    EntryPoint.LOG(String.format("[%s]: %b -> %b (fgp.prop)", feature, real, desired));
-                } else if (EntryPoint.getVerboseLogs() > 1) {
-                    EntryPoint.LOG(String.format("[%s]: %b (unchanged, fgp.prop)", feature, real));
+                    EntryPoint.LOG(String.format("[%s]: %b -> %b", feature, real, desired));
+                } else {
+                    EntryPoint.LOG(String.format("[%s]: %b (unchanged)", feature, real));
                 }
                 return desired;
             }

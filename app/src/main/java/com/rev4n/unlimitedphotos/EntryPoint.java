@@ -207,8 +207,6 @@ public final class EntryPoint {
             Field packageManagerField = findField(activityThreadClass, "sPackageManager");
             packageManagerField.setAccessible(true);
             packageManagerField.set(null, proxyPackageManager);
-
-            LOG("Spoof hasSystemFeature done!");
         } catch (Exception e) {
             LOG("Couldn't spoof system features: " + e);
         }
