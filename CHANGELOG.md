@@ -1,8 +1,9 @@
-## Google Photos Unlimited v4
+## Google Photos Unlimited v5
 
-- Fix Pixel-exclusive system services breaking: the module no longer hides `pixel_experience_<year>_exclusive.xml` sysconfig files system-wide on any device/ROM ([#19](https://github.com/Rev4N1/GPhotosUnlimited/issues/19))
-- Remove the module's dependency on `/system` mounting: a metamount module (e.g. Magic Mount) is no longer needed on KernelSU Next 3.0.0+, since Pixel-exclusive features now applied entirely in-process
-- Switch the default device profile to the original Pixel (non-XL), matching a real `sailfish` factory image build.prop (`PPR1.180610.009`, August 2018).
-- Document that unlimited storage has to be verified on a newly backed-up photo, since Google Photos no longer reliably shows the storage tier in its settings ([#18](https://github.com/Rev4N1/GPhotosUnlimited/issues/18))
+- Fix features (e.g. Unblur), only the features listed in `fgp.prop` are overridden and everything else passes through ([#20](https://github.com/Rev4N1/GPhotosUnlimited/issues/20))
+- Make Pixel feature spoofing configurable: add a `# Feature Overrides` section to `fgp.prop` so any `hasSystemFeature` query can be set to `true`/`false`
+- Switch the native hooking backend from Dobby to ShadowHook for better compatibility with newer Android versions ([#53](https://github.com/osm0sis/PlayIntegrityFork/pull/53))
+- Fix restoring from module versions up to v3: also remove stale `pixel_*_exclusive.xml` overrides and fully clean up the empty `$MODPATH/system` directory
+- Drop dead zygisk guards in `customize.sh`/`post-fs-data.sh` (zygisk has been required since rebase)
 
 _[Full changelogs](https://github.com/Rev4N1/GPhotosUnlimited/releases)_
