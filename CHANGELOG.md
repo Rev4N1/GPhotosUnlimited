@@ -2,6 +2,7 @@
 
 - Add autofgp script to generate a random Pixel/Pixel XL fingerprint from official builds, run automatically on install when no custom fingerprint exists
 - Add Action button to run autofgp or launch WebUI
+- Add WebUI
 - Add migrate script for custom.fgp.json/.prop
 
 ## Google Photos Unlimited v5
