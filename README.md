@@ -27,6 +27,12 @@ After installing (and rebooting), **back up a new photo**, then open that photo 
 
 If a newly backed-up photo *does* count against your storage, clear Google Photos app data and reboot, then take another photo and check again.
 
+## About 'autofgp.sh' script file
+
+The autofgp script generates a random fingerprint from a random official Pixel or Pixel XL (2016) build, so not everyone uses the same one. It runs automatically on first install when no custom.fgp.prop exists (if there is no internet connection the bundled default fgp.prop is used instead). Run it again from a root manager app that supports the module Action button, or with `sh autofgp.sh` in a root shell from the module directory. Existing Advanced Settings are retained, and the bundled default is used again by deleting custom.fgp.prop (a new one is generated on the next module update).
+
+Older formatted custom.fgp.json files will be automatically migrated to the latest json format on upgrade. A migration may also be performed manually in the module directory by running migrate.sh with `sh migrate.sh` in a root shell, `-f` or `--force` if desired, and `-p` or `--prop`, or `-j` or `--json` to force migration between formats.
+
 ## About 'custom.app_replace_list.txt' file
 
 You can customize the included default [app_replace_list.txt](https://raw.githubusercontent.com/Rev4N1/GPhotosUnlimited/main/module/app_replace_list.txt) from the module directory (/data/adb/modules/unlimitedphotos) then rename it to custom.app_replace_list.txt to systemlessly replace any additional conflicting custom ROM spoof injection app paths to disable them. Changes take effect after a reboot.

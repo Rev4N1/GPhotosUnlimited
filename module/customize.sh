@@ -21,3 +21,20 @@ done
 
 # Run common tasks for installation and boot-time
 . $MODPATH/common_setup.sh
+
+# Migrate custom.fgp.json to latest defaults if needed
+if [ -f "$MODPATH/custom.fgp.json" ]; then
+    chmod 755 $MODPATH/migrate.sh
+    sh $MODPATH/migrate.sh --install $MODPATH/custom.fgp.json
+    ui_print " "
+fi
+
+# Generate a random custom.fgp.prop if none was restored, falling back to the default fgp.prop
+if [ ! -f "$MODPATH/custom.fgp.prop" -a ! -f "$MODPATH/custom.fgp.json" ]; then
+    ui_print "- Generating random fingerprint with autofgp.sh"
+    if sh $MODPATH/autofgp.sh >/dev/null 2>&1 && [ -f "$MODPATH/custom.fgp.prop" ]; then
+        ui_print "  $(grep -m1 '^FINGERPRINT=' $MODPATH/custom.fgp.prop | cut -d= -f2)"
+    else
+        ui_print "! Failed to generate, using default fgp.prop (run Action button to retry)"
+    fi
+fi

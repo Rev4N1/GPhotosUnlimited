@@ -1,3 +1,9 @@
+## Google Photos Unlimited v6
+
+- Add autofgp script to generate a random Pixel/Pixel XL fingerprint from official builds, run automatically on install when no custom fingerprint exists
+- Add Action button to run autofgp or launch WebUI
+- Add migrate script for custom.fgp.json/.prop
+
 ## Google Photos Unlimited v5
 
 - Fix features (e.g. Unblur), only the features listed in `fgp.prop` are overridden and everything else passes through ([#20](https://github.com/Rev4N1/GPhotosUnlimited/issues/20))
