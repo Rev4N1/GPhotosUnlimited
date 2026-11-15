@@ -124,7 +124,7 @@
     <div class="stat-top"><span class="lbl">AutoFGP</span></div>
     <div class="hint" style="margin-top:0">Generate a random Pixel/Pixel XL print from a random official build.</div>
     <div class="util">
-      <button id="reapply">Generate</button>
+      <button id="generate">Generate</button>
       <button id="killPi">Kill Photos Processes</button>
     </div>
   </div>
@@ -132,9 +132,15 @@
   <div class="card">
     <details id="impBox">
       <summary>Import Custom Print<span class="chev">▾</span></summary>
+      <label class="flag" style="padding: 6px 2px; margin: 10px 0 4px 0; cursor: pointer;">
+        <span>Force migration to latest format</span>
+        <span class="sw"><input type="checkbox" id="migrateForce"><i></i></span>
+      </label>
+
       <div class="hint" style="margin: 10px 0 10px 0;">Select a local .prop file via Android File Picker:</div>
       <input type="file" id="filePicker" style="display:none;" onchange="handleFileSelect(event)">
       <button onclick="document.getElementById('filePicker').click()" style="width:100%; background:var(--surface2); border:1px solid var(--line); color:var(--text); padding:10px; border-radius:11px; font-size:.85rem; font-weight:600; cursor:pointer; margin-bottom:15px;">Browse Local Storage...</button>
+
       <div class="hint" style="margin: 0 0 10px 0;">Or download a .prop file via URL:</div>
       <input type="text" id="customPrintInput" placeholder="https://..." style="width:100%; background:var(--surface2); border:1px solid var(--line); color:var(--text); padding:10px; border-radius:11px; font-family:monospace; font-size:.8rem; margin-bottom:10px;">
       <div class="util" style="margin-top: 0;">
@@ -161,7 +167,7 @@
 
 
       <div class="flag" style="border-top: 1px solid var(--line);">
-        <span>Verbose Logs Level</span>
+        <span>Verbose Logs</span>
         <select id="verboseSelect" style="background:var(--surface2); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:6px 10px; font-weight:600; cursor:pointer; outline:none;">
           <option value="0">0 (Off)</option>
           <option value="1">1</option>
@@ -176,7 +182,7 @@
   <div class="card">
     <details id="outBox">
       <summary>Output<span class="chev">▾</span></summary>
-      <div id="term"><span class="m">Ready.</span></div>
+      <div id="term"><span class="m">Ready.<br></span></div>
     </details>
   </div>
 </div>
@@ -205,6 +211,8 @@ function exec(cmd,opts){
 }
 
 function toast(m){try{if(typeof ksu!=="undefined"&&ksu.toast)ksu.toast(m);}catch(e){}}
+
+function busy(b){document.querySelectorAll("button").forEach(x=>x.disabled=b);$("#refresh").disabled=false;}
 
 async function readConfig(){
   const r=await exec(`cat ${CFG} 2>/dev/null || cat ${DEF}`);const map={};
@@ -238,7 +246,7 @@ async function refresh(){
   const apiTarget=map["*api_level"]||map["ro.product.first_api_level"];
   const api=apiTarget?"First API "+apiTarget.value:"";
   const patchTarget=map["*.security_patch"]||map["ro.build.version.security_patch"];
-  const patch=patchTarget?(patchTarget.commented?"Patch OFF":"Patch "+patchTarget.value):"";
+  const patch=patchTarget?(patchTarget.commented?"Patch Commented":"Patch "+patchTarget.value):"";
   const releaseTest=await exec(`grep -oE 'Released:.*' ${CFG} | tr -d ':'`);
   const release=releaseTest.stdout.trim()?releaseTest.stdout.trim():"";
   const expiryTest=await exec(`grep -oE 'Estimated Expiry:.*' ${CFG} | tr -d ':'`);
@@ -293,35 +301,47 @@ async function addFeature(){
   await editFeature(`if grep -qE '^[#[:space:]]*${keyRe(k)}=' ${CFG}; then sed -i 's;^[#[:space:]]*${keyRe(k)}=.*;${k}=true;' ${CFG}; else sed -i '/^# Feature Overrides/,/^$/s/^$/${k}=true\\n/' ${CFG}; grep -qE '^${keyRe(k)}=' ${CFG} || echo '${k}=true' >> ${CFG}; fi`,`added ${k}=true`);
 }
 
+async function autoFgp(){
+  busy(true);
+  await refresh();
+  $("#outBox").open=true;
+  toast("Generating fingerprint…");
+  log("\n# autofgp.sh","g");
+  try{
+    const r=await exec(`sh ${MOD}/autofgp.sh 2>&1`);
+    (r.stdout||"").replace(/\n$/,"").split("\n").forEach(l=>log(l,/error|fail/i.test(l)?"e":(/warn/i.test(l)?"w":null)));
+    log(r.errno===0?"✓ Fingerprint applied":"✗ exit "+r.errno,r.errno===0?"g":"e");
+  } catch(e){log(e.message,"e");}
+  await refresh();
+  busy(false);
+}
+
+async function migrateCfg(args){
+  log("\n# migrate.sh "+args,"g");
+  try{
+    const r=await exec(`sh ${MOD}/migrate.sh ${args} ${CFG} 2>&1`);
+    (r.stdout||"").replace(/\n$/,"").split("\n").filter(Boolean).forEach(l=>log(l,null));
+  } catch(e){log(e.message,"e");}
+}
+
+async function killPi(){
+  log("\n# "+KILL,"g");
+  try{
+    const r=await exec(`${KILL} 2>&1`);
+    (r.stdout||"").replace(/\n$/,"").split("\n").filter(Boolean).forEach(l=>log(l,null));
+  } catch(e){log(e.message,"e");}
+  log("✓ Photos processes killed","g");
+}
+
 async function setFlag(k,v){
   try{
     // Ensure key exists via migrate.sh if missing, then update/uncomment it
     await exec(`[ -f ${CFG} ] || cp ${DEF} ${CFG}; grep -qE "^[#[:space:]]*${k}=" ${CFG} 2>/dev/null || sh ${MOD}/migrate.sh ${CFG}; sed -i "s;^[#[:space:]]*\\(${k}=\\).*;\\1${v};" ${CFG}`);
     const status = (k === "verboseLogs") ? v : (v === "1" ? "on" : "off");
     toast(`${LABEL[k] || k} ${status}`);
-    log(`set ${k}=${v}`,"m");
-  }
-  catch(e){log(e.message,"e");}
-}
-
-function busy(b){document.querySelectorAll("button").forEach(x=>x.disabled=b);$("#refresh").disabled=false;}
-
-async function run(args,label){
-  $("#outBox").open=true;log("\n$ autofgp "+args,"g");
-  try{
-    const r=await exec(`sh ${MOD}/autofgp.sh ${args} 2>&1`);
-    (r.stdout||"").replace(/\n$/,"").split("\n").forEach(l=>log(l,/error|fail/i.test(l)?"e":(/warn/i.test(l)?"w":null)));
-    log(r.errno===0?"✓ "+label:"✗ exit "+r.errno,r.errno===0?"g":"e");
-  }catch(e){log(e.message,"e");}
-}
-
-async function generate(){
-  busy(true);
-  try{
-    toast("Generating fingerprint…");
-    await run("","Fingerprint applied");
-  }catch(e){log(e.message,"e");}
-  await refresh();busy(false);
+    log(`Set ${k}=${v}`,"m");
+    await killPi();
+  } catch(e){log(e.message,"e");}
 }
 
 async function handleFileSelect(event) {
@@ -329,31 +349,21 @@ async function handleFileSelect(event) {
   if (!file) return;
 
   busy(true);
+  await refresh();
   $("#outBox").open = true;
-  log(`\n$ Reading local file: ${file.name}`, "g");
-
+  toast("Reading fingerprint from file…");
   const reader = new FileReader();
   reader.onload = async function(e) {
     try {
       const text = e.target.result;
       // Base64 encode to safely pass file contents through the root shell
       const b64 = btoa(unescape(encodeURIComponent(text)));
-
       await exec(`echo "${b64}" | base64 -d > ${CFG}`);
-      log(`✓ Copied ${file.name} to ${CFG}`, "g");
-
-      // Ensure Advanced Settings entries exist in imported prop
-      log("$ migrate.sh", "m");
-      await exec(`sh ${MOD}/migrate.sh ${CFG}`);
-
-      // Restart Photos processes to apply the print (bypassing autofgp)
-      log("$ " + KILL, "m");
-      await exec(KILL);
-
-      toast("Local print applied");
-    } catch (err) {
-      log(err.message, "e");
-    }
+      log(`Copied ${file.name} to ${CFG}`, "m");
+      await migrateCfg($("#migrateForce").checked?"-p":"");
+      await killPi();
+      log(`✓ Local fingerprint applied`, "g");
+    } catch(err){log(err.message,"e");}
     await refresh();
     busy(false);
     event.target.value = ""; // Reset picker
@@ -367,46 +377,33 @@ async function submitCustomUrl() {
     toast("Please enter a valid http/https URL.");
     return;
   }
-
   // Auto-convert standard GitHub blob links to raw.githubusercontent links
   if (url.includes("github.com") && url.includes("/blob/")) {
     url = url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/");
   }
 
   busy(true);
+  await refresh();
   $("#outBox").open = true;
-  log(`\n$ Fetching print from URL...`, "g");
-
+  toast("Fetching fingerprint from URL…");
   try {
     const response = await fetch(url);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
     const text = await response.text();
     // Base64 encode to safely pass file contents through the root shell
     const b64 = btoa(unescape(encodeURIComponent(text)));
-
     await exec(`echo "${b64}" | base64 -d > ${CFG}`);
-    log("✓ Download successful", "g");
-
-    // Ensure Advanced Settings entries exist in downloaded prop
-    log("$ migrate.sh", "m");
-    await exec(`sh ${MOD}/migrate.sh ${CFG}`);
-
-    // Restart Photos processes to apply the print
-    log("$ " + KILL, "m");
-    await exec(KILL);
-
-    toast("URL print applied");
-  } catch (err) {
-    log(`✗ Download failed: ${err.message}`, "e");
-  }
-
+    log(`Downloaded ${url} to ${CFG}`, "m");
+    await migrateCfg($("#migrateForce").checked?"-p":"");
+    await killPi();
+    log(`✓ URL fingerprint applied`, "g");
+  } catch(err){log(`✗ Download failed: ${err.message}`, "e");}
   await refresh();
   busy(false);
 }
 
-$("#reapply").onclick=generate;
-$("#killPi").onclick=async()=>{busy(true);$("#outBox").open=true;log("\n$ "+KILL,"g");try{const r=await exec(`${KILL} 2>&1`);(r.stdout||"").replace(/\n$/,"").split("\n").forEach(l=>log(l,"m"));log("✓ Photos processes killed","g");}catch(e){log(e.message,"e");}busy(false);};
+$("#generate").onclick=autoFgp;
+$("#killPi").onclick=async()=>{busy(true);await refresh();$("#outBox").open=true;await killPi();busy(false);};
 $("#refresh").onclick=refresh;
 $("#featAdd").onclick=addFeature;
 $("#featInput").onkeydown=e=>{if(e.key==="Enter")addFeature();};
