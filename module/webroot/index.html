@@ -186,6 +186,10 @@
           <option value="100">100 (Max)</option>
         </select>
       </div>
+
+      <div class="util mt-0">
+        <button onclick="saveFgpLog()">Save FGP Logcat</button>
+      </div>
     </details>
   </div>
 
@@ -330,7 +334,7 @@ async function migrateCfg(args){
   log("\n# migrate.sh "+args,"g");
   try{
     const r=await exec(`sh ${MOD}/migrate.sh ${args} ${CFG} 2>&1`);
-    (r.stdout||"").replace(/\n$/,"").split("\n").filter(Boolean).forEach(l=>log(l,null));
+    (r.stdout||"").replace(/\n$/,"").split("\n").forEach(l=>log(l,null));
   } catch(e){log(e.message,"e");}
 }
 
@@ -409,6 +413,19 @@ async function submitCustomUrl() {
     log(`✓ URL fingerprint applied`, "g");
   } catch(err){log(`✗ Download failed: ${err.message}`, "e");}
   await refresh();
+  busy(false);
+}
+
+async function saveFgpLog() {
+  busy(true);
+  await refresh();
+  $("#outBox").open=true;
+  toast("Saving FGP Logcat to /sdcard…");
+  log("\n# logcat -d | grep 'FGP/'","g");
+  try{
+    await exec(`logcat -d | grep 'FGP/' >/sdcard/fgp.log`);
+    log("✓ Logcat saved to /sdcard/fgp.log","g");
+  } catch(e){log(e.message,"e");}
   busy(false);
 }
 
