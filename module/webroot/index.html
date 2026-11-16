@@ -50,7 +50,7 @@
   .meta{margin-top:8px;font-size:.76rem;color:var(--muted)}
   .dates{margin-top:8px;font-size:.76rem;color:var(--muted)}
 
-  /* segmented source switch */
+  /* segmented mode switch */
   .seg{display:flex;background:var(--surface2);border-radius:12px;padding:4px;gap:4px}
   .seg button{flex:1;border:none;background:none;color:var(--muted);font-size:.9rem;font-weight:600;
     padding:11px;border-radius:9px;cursor:pointer;transition:.15s}
@@ -256,7 +256,7 @@ async function refresh(){
   else{badge.textContent="● Custom";badge.className="badge custom";}
 
   $("#fp").textContent=has?fp:"No fingerprint — choose an option below.";
-  const name=map["MANUFACTURER"].value+" "+map["MODEL"].value;
+  const name=(val(map,"MANUFACTURER")+" "+val(map,"MODEL")).trim();
   const apiTarget=map["*api_level"]||map["ro.product.first_api_level"];
   const api=apiTarget?"First API "+apiTarget.value:"";
   const patchTarget=map["*.security_patch"]||map["ro.build.version.security_patch"];
@@ -411,6 +411,7 @@ async function submitCustomUrl() {
     await migrateCfg($("#migrateForce").checked?"-p":"");
     await killPi();
     log(`✓ URL fingerprint applied`, "g");
+    $("#customPrintInput").value = "";
   } catch(err){log(`✗ Download failed: ${err.message}`, "e");}
   await refresh();
   busy(false);
