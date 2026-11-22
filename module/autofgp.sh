@@ -148,7 +148,7 @@ if [ -f "$MIGRATE" ]; then
       *.prop) grep -v '^[[:space:]]*#' $OLDFGP | grep '^[^=]*\.[^=]*=';;
     esac | grep '^[^=]*[A-Z][^=]*=' >> fgp.prop;
   fi;
-  item "Converting fgp.prop to custom.fgp.prop with migrate.sh:";
+  item "Converting fgp.prop to custom.fgp.prop ...";
   rm -f fgp.json custom.fgp.json custom.fgp.prop;
   sh $MIGRATE -i fgp.prop;
   grep_config() {
