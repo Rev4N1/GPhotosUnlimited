@@ -14,8 +14,6 @@ To use this module you must have one of the following (latest versions):
 - [KernelSU Next](https://github.com/KernelSU-Next/KernelSU-Next) with [Zygisk Next](https://github.com/Dr-TSNG/ZygiskNext) or [ReZygisk](https://github.com/PerformanC/ReZygisk) or [NeoZygisk](https://github.com/JingMatrix/NeoZygisk) module installed
 - [APatch](https://github.com/bmax121/APatch) with [Zygisk Next](https://github.com/Dr-TSNG/ZygiskNext) or [ReZygisk](https://github.com/PerformanC/ReZygisk) or [NeoZygisk](https://github.com/JingMatrix/NeoZygisk) module installed
 
-Note: [SukiSU Nova](https://github.com/SukiSU-Nova/SukiSU-Nova) limits Action button script execution to 10 seconds so is not fully compatible and cannot be recommended.
-
 ## About module
 
 It injects a classes.dex file to modify fields in the android.os.Build class. Also, it creates a hook in the native code to modify system properties, and one on `PackageManager.hasSystemFeature()` to answer the Pixel-exclusive feature checks Google Photos uses to decide the backup tier. These are spoofed only into the Google Photos process, entirely in-process, without mounting or modifying any `/system` files, and with no per-device or per-ROM exception - the same answers are forced on every device and every ROM.
